@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IFVote - Master Admin (Controle Remoto)</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0b0e14; color: #c9d1d9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .master-box { background: #161b22; border: 2px solid #da3633; border-radius: 12px; padding: 40px; width: 450px; text-align: center; box-shadow: 0 0 25px rgba(218, 54, 51, 0.3); }
+        h1 { color: #f85149; margin-top: 0; font-size: 1.8rem; }
+        p { color: #8b949e; line-height: 1.5; }
+        .btn-kill { background: #da3633; color: white; border: none; padding: 18px 24px; border-radius: 8px; font-size: 1.2rem; font-weight: bold; cursor: pointer; width: 100%; margin-top: 20px; transition: transform 0.1s, background 0.2s; }
+        .btn-kill:hover { background: #b92c29; transform: scale(1.02); }
+        .btn-kill:active { transform: scale(0.98); }
+        #status-master { margin-top: 20px; font-weight: bold; padding: 10px; border-radius: 6px; display: none; }
+        .ativo { background: rgba(46, 160, 67, 0.2); color: #3fb950; border: 1px solid #3fb950; }
+        .bloqueado { background: rgba(248, 81, 73, 0.2); color: #f85149; border: 1px solid #f85149; }
+    </style>
+</head>
+<body>
+
+<div class="master-box">
+    <h1>⚠️ Master Admin — PA</h1>
+    <p>Painel de Interrupção de Emergência (Kill Switch Remoto). Ao acionar este comando, todas as urnas em execução serão bloqueadas imediatamente no servidor.</p>
+
+    <button class="btn-kill" onclick="encerrarEleicaoRemotamente()">🛑 ENCERRAR ELEIÇÃO AGORA</button>
+
+    <div id="status-master"></div>
+</div>
+
+<script src="config.js"></script>
+<script>
+    // Quando hospedar o backend no Render/Railway, substitua localhost pela URL de produção
+    const API_URL = (window.IFVOTE_CONFIG && window.IFVOTE_CONFIG.apiUrl)
+        || 'https://SEU-BACKEND.exemplo.com/api';
+
+    function obterTokenAdmin() {
+        let token = sessionStorage.getItem('ifvote_admin_token');
+        if (!token) {
+            token = prompt('Informe o token administrativo da eleição:');
+            if (!token) throw new Error('Token administrativo obrigatório.');
+            sessionStorage.setItem('ifvote_admin_token', token);
+        }
+        return token;
+    }
+
+    async function encerrarEleicaoRemotamente() {
+        if (!confirm("Tem certeza de que deseja FORÇAR O ENCERRAMENTO de todas as urnas agora?")) {
+            return;
+        }
+
+        const statusDiv = document.getElementById('status-master');
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'status-master';
+        statusDiv.innerText = "Enviando sinal de bloqueio...";
+
+        try {
+            // Enviamos 0 minutos ativos para o servidor travar o middleware na hora
+            const res = await fetch(`${API_URL}/admin/iniciar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Admin-Token': obterTokenAdmin()
+                },
+                body: JSON.stringify({ minutosAtivos: 0 })
+            });
+
+            if (res.ok) {
+                statusDiv.className = 'status-master bloqueado';
+                statusDiv.innerText = "ELEIÇÃO ENCERRADA COM SUCESSO! Todas as urnas estão bloqueadas.";
+            } else {
+                statusDiv.className = 'status-master bloqueado';
+                statusDiv.innerText = "Falha ao enviar comando para o servidor.";
+            }
+        } catch (err) {
+            statusDiv.className = 'status-master bloqueado';
+            statusDiv.innerText = "Erro de conexão com o backend.";
+        }
+    }
+</script>
+
+</body>
+</html>

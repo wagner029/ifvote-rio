@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IFVote - Painel da Comissão Eleitoral</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0d1117; color: #c9d1d9; padding: 30px; margin: 0; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { color: #58a6ff; border-bottom: 2px solid #30363d; padding-bottom: 10px; }
+        .card { background: #161b22; padding: 24px; border-radius: 8px; margin-bottom: 24px; border: 1px solid #30363d; border-left: 5px solid #238636; }
+        .card.danger { border-left-color: #da3633; }
+        h2 { margin-top: 0; color: #f0f6fc; }
+        p { color: #8b949e; }
+        button { background: #238636; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-right: 10px; margin-top: 10px; transition: 0.2s; }
+        button:hover { background: #2ea043; }
+        button.pdf-btn { background: #1f6feb; }
+        button.pdf-btn:hover { background: #388bfd; }
+        input[type="file"], input[type="number"] { padding: 10px; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 6px; margin-top: 8px; }
+        #status-msg { padding: 12px; background: #21262d; border-radius: 6px; margin-bottom: 20px; font-weight: bold; color: #e3b341; }
+        pre { background: #010409; padding: 15px; border-radius: 6px; border: 1px solid #30363d; color: #7ee787; overflow-x: auto; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>IFVote — Painel da Comissão Eleitoral</h1>
+    <div id="status-msg">Status: Aguardando comandos da comissão...</div>
+
+    <!-- Módulo 1: Importação e Zerésima -->
+    <div class="card">
+        <h2>1. Preparação da Eleição</h2>
+        <p>Importe a lista oficial de eleitores aptos (arquivo CSV com os cabeçalhos: <code>matricula,nome,turma</code>).</p>
+        <input type="file" id="arquivoCsv" accept=".csv"><br>
+        <button onclick="importarCSV()">Importar Eleitores (CSV)</button>
+        <hr style="border: 0; border-top: 1px solid #30363d; margin: 20px 0;">
+        <p>Emita a Zerésima Oficial para comprovar que a urna não possui votos antes da abertura do pleito.</p>
+        <button class="pdf-btn" onclick="baixarPDF('zeresima')">📄 Baixar Zerésima (PDF)</button>
+    </div>
+
+    <!-- Módulo 2: Controle de Votação Presencial -->
+    <div class="card">
+        <h2>2. Ativar Urnas Presenciais</h2>
+        <p>Defina a duração da eleição (em minutos). O backend travará as urnas automaticamente após a contagem.</p>
+        <label>Tempo de votação (minutos): </label><br>
+        <input type="number" id="minutos" value="30" min="1" max="600">
+        <button onclick="iniciarEleicao()">🚀 Liberar Urnas</button>
+    </div>
+
+    <!-- Módulo 3: Apuração e Encerramento -->
+    <div class="card danger">
+        <h2>3. Apuração e Boletim de Urna</h2>
+        <p>Acompanhe o placar parcial ou emita o documento oficial final assinado com o Hash de segurança.</p>
+        <button onclick="verResultados()">📊 Atualizar Placar Parcial</button>
+        <button class="pdf-btn" onclick="baixarPDF('boletim')">📄 Baixar Boletim de Urna (PDF)</button>
+        <pre id="placar-tela">Aguardando solicitação de placar...</pre>
+    </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+    const API_URL = (window.IFVOTE_CONFIG && window.IFVOTE_CONFIG.apiUrl)
+        || 'https://SEU-BACKEND.exemplo.com/api';
+
+    function obterTokenAdmin() {
+        let token = sessionStorage.getItem('ifvote_admin_token');
+        if (!token) {
+            token = prompt('Informe o token administrativo da eleição:');
+            if (!token) throw new Error('Token administrativo obrigatório.');
+            sessionStorage.setItem('ifvote_admin_token', token);
+        }
+        return token;
+    }
+
+    function logStatus(msg) {
+        document.getElementById('status-msg').innerText = `Status: ${msg}`;
+    }
+
+    async function importarCSV() {
+        const arquivo = document.getElementById('arquivoCsv').files[0];
+        if (!arquivo) return alert("Por favor, selecione um arquivo CSV.");
+
+        const formData = new FormData();
+        formData.append('arquivo', arquivo);
+
+        logStatus("Enviando arquivo CSV para o banco...");
+        try {
+            const res = await fetch(`${API_URL}/admin/importar-csv`, {
+                method: 'POST',
+                headers: { 'X-Admin-Token': obterTokenAdmin() },
+                body: formData
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.mensagem);
+                logStatus("Importação concluída com sucesso.");
+            } else {
+                alert("Erro: " + data.erro);
+                logStatus("Falha ao importar eleitores.");
+            }
+        } catch (err) {
+            alert("Erro de conexão com o servidor.");
+        }
+    }
+
+    async function iniciarEleicao() {
+        const minutos = document.getElementById('minutos').value;
+        try {
+            const res = await fetch(`${API_URL}/admin/iniciar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Admin-Token': obterTokenAdmin()
+                },
+                body: JSON.stringify({ minutosAtivos: parseInt(minutos) })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(`Urnas ativas! Previsão de encerramento: ${new Date(data.encerramento_previsto).toLocaleTimeString('pt-BR')}`);
+                logStatus("Eleição em andamento.");
+            } else {
+                alert("Erro: " + data.erro);
+            }
+        } catch (err) {
+            alert("Erro ao conectar com o servidor.");
+        }
+    }
+
+    async function verResultados() {
+        try {
+            const res = await fetch(`${API_URL}/resultados`);
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById('placar-tela').innerText = JSON.stringify(data, null, 2);
+                logStatus("Placar atualizado.");
+            } else {
+                alert("Erro: " + data.erro);
+            }
+        } catch (err) {
+            alert("Erro ao buscar apuração.");
+        }
+    }
+
+    async function baixarPDF(tipo) {
+        try {
+            const res = await fetch(`${API_URL}/admin/${tipo}`, {
+                headers: { 'X-Admin-Token': obterTokenAdmin() }
+            });
+            if (!res.ok) throw new Error('Falha ao gerar o PDF.');
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${tipo}.pdf`;
+            link.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+</script>
+
+</body>
+</html>

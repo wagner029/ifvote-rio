@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IFVote - Urna Eletrônica</title>
+    <style>
+        :root {
+            --urna-bg: #dcdcd2;
+            --teclado-bg: #2d2d2d;
+            --tecla-num: #1a1a1a;
+            --branco: #ffffff;
+            --corrige: #ff8c00;
+            --confirma: #1b873f;
+        }
+
+        body {
+            background-color: #0b0e14;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        /* Estrutura Principal baseada na imagem */
+        .urna-física {
+            display: flex;
+            background-color: var(--urna-bg);
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 5px 15px rgba(255,255,255,0.5);
+            width: 950px;
+            height: 500px;
+            gap: 30px;
+        }
+
+        /* TELA DA URNA */
+        .tela-container {
+            flex: 1.2;
+            background-color: #fff;
+            border: 3px solid #b0b0b0;
+            border-radius: 5px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        .topo-tela { font-size: 1.2rem; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; }
+        .cargo { font-size: 2rem; text-align: center; font-weight: bold; margin-bottom: 20px; }
+        
+        .caixas-input { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        .digito-box {
+            width: 40px; height: 50px;
+            border: 2px solid #000;
+            font-size: 2rem;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold;
+        }
+        
+        .info-candidato { font-size: 1.5rem; text-align: center; height: 60px; font-weight: bold; }
+        
+        .rodape-instrucoes {
+            border-top: 2px solid #000;
+            padding-top: 10px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        /* TELA DE FIM */
+        .tela-fim {
+            display: none;
+            font-size: 7rem;
+            font-weight: bold;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            letter-spacing: 5px;
+        }
+
+        /* TECLADO */
+        .teclado-container {
+            flex: 0.8;
+            background-color: var(--teclado-bg);
+            border-radius: 5px;
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0px 5px 10px rgba(0,0,0,0.5);
+        }
+
+        .numeros-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .tecla {
+            background-color: var(--tecla-num);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            width: 70px;
+            height: 50px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 2px 5px 0px #000;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .tecla:active { transform: translateY(3px); box-shadow: 1px 2px 0px #000; }
+        .tecla-0 { grid-column: 2; } /* Centraliza o zero */
+
+        .acoes-flex { display: flex; gap: 10px; width: 100%; justify-content: space-between; align-items: flex-end; }
+        
+        .btn-acao {
+            border: none; border-radius: 4px; padding: 15px 5px;
+            font-size: 0.8rem; font-weight: bold; text-transform: uppercase;
+            cursor: pointer; width: 30%; height: 50px;
+            box-shadow: 2px 4px 0px rgba(0,0,0,0.5);
+            color: #000;
+        }
+        .btn-acao:active { transform: translateY(3px); box-shadow: 1px 2px 0px rgba(0,0,0,0.5); }
+        
+        .btn-branco { background-color: var(--branco); }
+        .btn-corrige { background-color: var(--corrige); }
+        .btn-confirma { background-color: var(--confirma); height: 60px; font-size: 0.9rem; } /* Confirma é maior */
+
+        /* Tela de Bloqueio Vermelha */
+        #bloqueio-tela {
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #b91c1c; color: white; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 9999; font-family: Arial, sans-serif;
+        }
+        #bloqueio-tela h2 { font-size: 3rem; margin-bottom: 10px; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+
+
+
+<div id="bloqueio-tela">
+    <h2>VOTAÇÃO ENCERRADA</h2>
+    <p>O tempo regulamentar expirou.</p>
+</div>
+
+<div class="urna-física">
+    <!-- VISOR DA URNA -->
+    <div class="tela-container" id="tela-principal">
+        <div class="topo-tela" id="topo-tela">Etapa 1/2</div>
+        <div class="cargo" id="titulo-cargo">INFORME SUA MATRÍCULA</div>
+        
+        <div class="caixas-input" id="caixas-input">
+            <!-- As caixas serão geradas pelo Javascript -->
+        </div>
+
+        <div class="info-candidato" id="info-candidato"></div>
+
+        <div class="rodape-instrucoes" id="rodape" style="display: none;">
+            Aperte a tecla:<br>
+            <b>VERDE</b> para CONFIRMAR este voto<br>
+            <b>LARANJA</b> para CORRIGIR este voto
+        </div>
+    </div>
+
+    <!-- TELA FIM (Escondida por padrão) -->
+    <div class="tela-container tela-fim" id="tela-fim">FIM</div>
+
+    <!-- TECLADO FÍSICO VIRTUAL -->
+    <div class="teclado-container">
+        <div class="numeros-grid">
+            <button class="tecla" onclick="digitar('1')">1</button>
+            <button class="tecla" onclick="digitar('2')">2</button>
+            <button class="tecla" onclick="digitar('3')">3</button>
+            <button class="tecla" onclick="digitar('4')">4</button>
+            <button class="tecla" onclick="digitar('5')">5</button>
+            <button class="tecla" onclick="digitar('6')">6</button>
+            <button class="tecla" onclick="digitar('7')">7</button>
+            <button class="tecla" onclick="digitar('8')">8</button>
+            <button class="tecla" onclick="digitar('9')">9</button>
+            <button class="tecla tecla-0" onclick="digitar('0')">0</button>
+        </div>
+        <div class="acoes-flex">
+            <button class="btn-acao btn-branco" onclick="votoBranco()">Branco</button>
+            <button class="btn-acao btn-corrige" onclick="corrigir()">Corrige</button>
+            <button class="btn-acao btn-confirma" onclick="confirmar()">Confirma</button>
+        </div>
+    </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+
+    
+
+    const API_URL = (window.IFVOTE_CONFIG && window.IFVOTE_CONFIG.apiUrl)
+        || 'https://SEU-BACKEND.exemplo.com/api';
+    
+    
+    // Variáveis de Estado
+    let etapa = 'MATRICULA'; 
+    let matriculaDigitada = '';
+    let chapaDigitada = '';
+    
+    // ==========================================
+    // MOTOR DE ÁUDIO NATIVO (SÍNTESE ELETRÔNICA)
+    // ==========================================
+    let audioCtx;
+
+    function iniciarAudio() {
+        if (!audioCtx) {
+            // Cria o contexto de áudio apenas na primeira interação do usuário
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
+
+    function tocarSomTecla() {
+        iniciarAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc.type = 'sine'; // Som suave e pontual
+        osc.frequency.setValueAtTime(1500, audioCtx.currentTime); // Frequência do bip
+        
+        // Define o volume e faz um fade-out rápido (0.1 segundos)
+        gain.gain.setValueAtTime(0.5, audioCtx.currentTime); 
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); 
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
+    }
+
+    function tocarSomConfirma() {
+        iniciarAudio();
+        let tempoBase = audioCtx.currentTime;
+        
+        // Função auxiliar para injetar notas na linha do tempo
+        function tocarNota(freq, duracao, inicio) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = 'square'; // 'square' dá o tom eletrônico/retrô da urna real
+            osc.frequency.setValueAtTime(freq, inicio);
+            
+            gain.gain.setValueAtTime(0.3, inicio); // Volume
+            gain.gain.exponentialRampToValueAtTime(0.01, inicio + duracao);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.start(inicio);
+            osc.stop(inicio + duracao);
+        }
+
+        // O clássico "Pililililili" (Sequência rápida de bips oscilantes)
+        for (let i = 0; i < 5; i++) {
+            tocarNota(1400, 0.08, tempoBase + (i * 0.12));
+            tocarNota(1800, 0.08, tempoBase + (i * 0.12) + 0.06);
+        }
+        // Nota longa final de confirmação
+        tocarNota(2000, 0.8, tempoBase + 0.60);
+    }
+    // ==========================================
+
+    
+
+    // Configura a tela dependendo da etapa (Matrícula ou Voto)
+    function atualizarTela() {
+        const caixasDiv = document.getElementById('caixas-input');
+        const infoDiv = document.getElementById('info-candidato');
+        caixasDiv.innerHTML = '';
+        
+        if (etapa === 'MATRICULA') {
+            document.getElementById('topo-tela').innerText = 'Identificação';
+            document.getElementById('titulo-cargo').innerText = 'INFORME SUA MATRÍCULA';
+            document.getElementById('rodape').style.display = 'none';
+            infoDiv.innerText = '';
+            
+            // Cria as caixinhas da matrícula baseado no que já foi digitado
+            const displayValor = matriculaDigitada || '           '; // 11 espaços (ajuste se sua matrícula for maior)
+            caixasDiv.style.flexWrap = 'wrap';
+            caixasDiv.innerHTML = `<div style="font-size:1.8rem; letter-spacing:10px; border-bottom: 2px solid #000; min-width: 250px; text-align: center;">${matriculaDigitada}</div>`;
+        } 
+        else if (etapa === 'CHAPA') {
+            document.getElementById('topo-tela').innerText = 'Seu voto para';
+            document.getElementById('titulo-cargo').innerText = 'CHAPA DO GRÊMIO';
+            document.getElementById('rodape').style.display = 'block';
+            
+            if (chapaDigitada === 'BRANCO') {
+                caixasDiv.innerHTML = '';
+                infoDiv.innerHTML = '<span style="font-size: 2.5rem; letter-spacing: 5px;">VOTO EM BRANCO</span>';
+            } else {
+                // Desenha 2 caixas para os dígitos da chapa
+                let d1 = chapaDigitada[0] || '';
+                let d2 = chapaDigitada[1] || '';
+                caixasDiv.innerHTML = `
+                    <div class="digito-box">${d1}</div>
+                    <div class="digito-box">${d2}</div>
+                `;
+
+                // Mostra o nome da chapa ao bater 2 dígitos
+                if (chapaDigitada.length === 2) {
+                    if (chapaDigitada === '10') infoDiv.innerText = 'CHAPA 10 - RENOVAÇÃO ESTUDANTIL';
+                    else if (chapaDigitada === '20') infoDiv.innerText = 'CHAPA 20 - VOZ ATIVA';
+                    else infoDiv.innerHTML = '<span style="color:red">CHAPA INEXISTENTE<br>VOTO NULO</span>';
+                } else {
+                    infoDiv.innerText = '';
+                }
+            }
+        }
+    }
+
+    // Ações do Teclado
+    function digitar(numero) {
+        tocarSomTecla();
+        if (etapa === 'MATRICULA') {
+            if (matriculaDigitada.length < 15) matriculaDigitada += numero;
+        } else if (etapa === 'CHAPA' && chapaDigitada !== 'BRANCO') {
+            if (chapaDigitada.length < 2) chapaDigitada += numero;
+        }
+        atualizarTela();
+    }
+
+    function corrigir() {
+        tocarSomTecla();
+        if (etapa === 'MATRICULA') {
+            matriculaDigitada = '';
+        } else if (etapa === 'CHAPA') {
+            chapaDigitada = '';
+        }
+        atualizarTela();
+    }
+
+    function votoBranco() {
+        tocarSomTecla();
+        if (etapa === 'CHAPA') {
+            chapaDigitada = 'BRANCO';
+            atualizarTela();
+        }
+    }
+
+    async function confirmar() {
+        if (etapa === 'MATRICULA') {
+            if (matriculaDigitada.length > 3) {
+                tocarSomTecla();
+                etapa = 'CHAPA'; // Avança para a tela de voto
+                atualizarTela();
+            }
+        } 
+        else if (etapa === 'CHAPA') {
+            if (chapaDigitada.length === 2 || chapaDigitada === 'BRANCO') {
+                // Tenta enviar o voto
+                enviarVoto(matriculaDigitada, chapaDigitada);
+            }
+        }
+    }
+
+    async function enviarVoto(matricula, chapa) {
+        try {
+            const res = await fetch(`${API_URL}/votar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ matricula, chapaId: chapa })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                // SUCESSO ABSOLUTO - FINALIZA A VOTAÇÃO
+               tocarSomConfirma();
+                
+                document.getElementById('tela-principal').style.display = 'none';
+                document.getElementById('tela-fim').style.display = 'flex';
+
+                // Reseta a urna para o próximo eleitor após 4 segundos
+                setTimeout(() => {
+                    etapa = 'MATRICULA';
+                    matriculaDigitada = '';
+                    chapaDigitada = '';
+                    document.getElementById('tela-principal').style.display = 'flex';
+                    document.getElementById('tela-fim').style.display = 'none';
+                    atualizarTela();
+                }, 4000);
+
+            } else {
+                tocarSomTecla();
+                if (res.status === 403 && data.erro.includes("encerrada")) {
+                    document.getElementById('bloqueio-tela').style.display = 'flex';
+                } else {
+                    alert(`ERRO: ${data.erro}`);
+                    corrigir(); // Limpa para tentar novamente
+                }
+            }
+        } catch (err) {
+            alert("ERRO: Urna offline ou sem comunicação com o servidor.");
+        }
+    }
+
+    // Inicializa a tela ao abrir o software
+    atualizarTela();
+</script>
+
+</body>
+</html>

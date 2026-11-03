@@ -1,3 +1,7 @@
 node_modules/
 .env
 auditoria_votos.log
+uploads/
+backup_urna_*.log
+*.pdf
+*.log
